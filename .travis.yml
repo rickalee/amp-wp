@@ -39,6 +39,7 @@ cache:
     - node_modules
     - vendor
     - $HOME/phpunit-bin
+    - $HOME/deployment-targets
 
 matrix:
   include:
@@ -56,15 +57,27 @@ matrix:
      env: WP_VERSION=4.7
      # 7.1 / latest already included above as first build.
    - php: "7.1"
-     env: WP_VERSION=4.7
+     env: WP_VERSION=4.7 DEPLOY_TEST_SITE=true
 
 install:
   - nvm install 6 && nvm use 6
   - export DEV_LIB_PATH=dev-lib
   - source $DEV_LIB_PATH/travis.install.sh
+  - echo "TRAVIS_PULL_REQUEST=$TRAVIS_PULL_REQUEST"
+  - echo "TRAVIS_BRANCH=$TRAVIS_BRANCH"
+  - echo "TRAVIS_EVENT_TYPE=$TRAVIS_EVENT_TYPE"
+  - echo "TRAVIS_PULL_REQUEST_BRANCH=$TRAVIS_PULL_REQUEST_BRANCH"
 
 script:
   - source $DEV_LIB_PATH/travis.script.sh
 
 after_script:
   - source $DEV_LIB_PATH/travis.after_script.sh
+
+after_success:
+  - |
+    if [[ $DEPLOY_TEST_SITE == true ]] && [[ ! -z $TRAVIS_BRANCH ]] && [[ $TRAVIS_PULL_REQUEST == false ]]; then
+      eval "$(ssh-agent -s)"
+      openssl aes-256-cbc -K $encrypted_7eb11f40d4e9_key -iv $encrypted_7eb11f40d4e9_iv -in bin/keys/id_rsa_ampconfdemo.enc -out bin/keys/id_rsa_ampconfdemo -d && chmod 600 bin/keys/id_rsa_ampconfdemo
+      ./bin/deploy-travis-pantheon.sh ampconfdemo db7f3307-9808-4753-aaa4-acb387c94472 $(pwd)/bin/keys/id_rsa_ampconfdemo
+    fi
